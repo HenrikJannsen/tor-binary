@@ -29,6 +29,26 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
    mvn -N -Pcheck-pgp-signatures verify
    ```
 
+When updating checksums, make sure the six filenames in `tor-binary-resources/checksums` exactly match the six bundles listed in `build.xml`. Remove checksum files from the previous Tor Browser version before running Ant; Ant writes new files but does not remove obsolete files. For a manual update, copy the SHA-256 value for each `tor-expert-bundle-*.tar.gz` from the signed checksum list for the selected Tor Browser version into a file named `<bundle>.tar.gz.SHA-256` (the file must contain only the hash). For the current version, the [signed checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.21/sha256sums-signed-build.txt) is the source of truth. Then verify the result with:
+
+```
+rm tor-binary-resources/checksums/tor-expert-bundle-*.SHA-256
+ant -f build.xml
+mvn -N -Pcheck-pgp-signatures verify
+```
+
+The first two commands download the bundles, verify their PGP signatures, and regenerate the checksum files. Because each tracked checksum file contains only a hash, use the following command to compare the regenerated checksums with the downloaded bundles in `tmp`:
+
+```
+for checksum in tor-binary-resources/checksums/*.SHA-256; do
+    bundle="${checksum##*/}"
+    bundle="${bundle%.SHA-256}"
+    test "$(cat "$checksum")" = "$(sha256sum "tmp/$bundle" | cut -d' ' -f1)"
+done
+```
+
+After changing `torbrowser.version`, also update the Maven project version in every module listed above, then run `mvn clean install` to confirm that all platform artifacts and the GeoIP artifact can be built.
+
 Tor Browser versions can be found here: https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]
 
 # Pre-requisites
