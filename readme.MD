@@ -29,7 +29,7 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
    mvn -N -Pcheck-pgp-signatures verify
    ```
 
-When updating checksums, make sure the six filenames in `tor-binary-resources/checksums` exactly match the six bundles listed in `build.xml`. Remove checksum files from the previous Tor Browser version before running Ant; Ant writes new files but does not remove obsolete files. For a manual update, copy the SHA-256 value for each `tor-expert-bundle-*.tar.gz` from the signed checksum list for the selected Tor Browser version into a file named `<bundle>.tar.gz.SHA-256` (the file must contain only the hash). For the current version, the [signed checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.21/sha256sums-signed-build.txt) is the source of truth. Then verify the result with:
+When updating checksums, make sure the six filenames in `tor-binary-resources/checksums` exactly match the six bundles listed in `build.xml`. Remove checksum files from the previous Tor Browser version before running Ant; Ant writes new files but does not remove obsolete files. For a manual update, copy the SHA-256 value for each `tor-expert-bundle-*.tar.gz` from the signed checksum list for the selected Tor Browser version into a file named `<bundle>.tar.gz.SHA-256` (the file must contain only the hash). For the current version, the [signed checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.22/sha256sums-signed-build.txt) is the source of truth. Then verify the result with:
 
 ```
 rm tor-binary-resources/checksums/tor-expert-bundle-*.SHA-256
