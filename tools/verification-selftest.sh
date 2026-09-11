@@ -321,7 +321,10 @@ fi
 
 keyserver_pid=""
 stop_keyserver_stub() {
-    [ -n "$keyserver_pid" ] && kill "$keyserver_pid" >/dev/null 2>&1
+    if [ -n "$keyserver_pid" ]; then
+        kill "$keyserver_pid" >/dev/null 2>&1
+        wait "$keyserver_pid" 2>/dev/null
+    fi
     keyserver_pid=""
     rm -f "$work_directory/keyserver.port"
 }
@@ -347,11 +350,17 @@ with socketserver.TCPServer(("127.0.0.1", 0), Handler) as server:
 ' "$1" "$work_directory/keyserver.port" &
     keyserver_pid=$!
     local attempt=0
-    while [ ! -s "$work_directory/keyserver.port" ] && [ "$attempt" -lt 100 ]; do
+    while [ ! -s "$work_directory/keyserver.port" ] && [ "$attempt" -lt 100 ] \
+        && kill -0 "$keyserver_pid" 2>/dev/null; do
         sleep 0.1
         attempt=$((attempt + 1))
     done
-    [ -s "$work_directory/keyserver.port" ]
+    if [ -s "$work_directory/keyserver.port" ]; then
+        return 0
+    fi
+    fail "stub keyserver" "could not start"
+    stop_keyserver_stub
+    return 1
 }
 
 # run_fetching_verification <file> <pinned fingerprint> <keyserver>
@@ -371,9 +380,7 @@ else
     signer_gpg --export --armor "$expected_key" > "$work_directory/expected.asc" 2>/dev/null
     signer_gpg --export --armor "$crafted_key" > "$work_directory/other.asc" 2>/dev/null
 
-    if ! start_keyserver_stub "$work_directory/expected.asc"; then
-        fail "stub keyserver" "could not start"
-    else
+    if start_keyserver_stub "$work_directory/expected.asc"; then
         keyserver="hkp://127.0.0.1:$(cat "$work_directory/keyserver.port")"
         output="$(run_fetching_verification "$work_directory/manifest.txt" "$expected_key" "$keyserver")"
         if [ $? -eq 0 ]; then
