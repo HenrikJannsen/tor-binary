@@ -2,7 +2,9 @@
 <project name="tor-binaries" default="checkSignatures">
 
     <property name="project.source.directory" value="tmp"/>
-    <property name="torbrowser.version" value="15.0.21"/>
+    <xmlproperty file="pom.xml" prefix="pom"/>
+    <property name="torbrowser.version" value="${pom.project.properties.torbrowser.version}"/>
+    <property name="pgp.signature.keyserver" value="${pom.project.properties.pgp.signature.keyserver}"/>
     <property name="torbrowser.download.base.url" value="https://archive.torproject.org/tor-package-archive/torbrowser/${torbrowser.version}"/>
     <target name="checkSignatures">
 
@@ -61,27 +63,27 @@
         <parallel>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"></arg>
             </exec>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz"></arg>
             </exec>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz"></arg>
             </exec>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"></arg>
             </exec>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"></arg>
             </exec>
             <exec executable="gpg" failonerror="true">
                 <arg
-                    line="--auto-key-locate keyserver --keyserver keys.openpgp.org --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"></arg>
+                    line="--auto-key-locate keyserver --keyserver ${pgp.signature.keyserver} --keyserver-options auto-key-retrieve --verify ${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz.asc ${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"></arg>
             </exec>
         </parallel>
 
