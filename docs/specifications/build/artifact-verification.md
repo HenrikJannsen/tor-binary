@@ -10,14 +10,21 @@
 
 ## Manifest format
 
-One entry per line: the SHA-256 digest in lowercase hexadecimal, exactly two spaces, then the bundle name,
-matched literally and without a path prefix. A trailing carriage return is tolerated so that a manifest
-checked out on Windows still verifies. Exactly one entry may match a given bundle.
+A matching entry occupies one line: the SHA-256 digest in lowercase hexadecimal, exactly two spaces, then
+the bundle name, matched literally and without a path prefix. A trailing carriage return is tolerated by
+checksum lookup. Exactly one valid entry may match a given bundle; repeated valid entries fail even when
+their digests are identical.
 
-Anything else is rejected, including a tab or a single space as the separator, an uppercase digest, a digest
-of the wrong length, and the `digest *name` form that `sha256sum` writes in binary mode. This is why
-`tor-binary-resources/checksums/**` is excluded from end-of-line conversion in `.gitattributes`: the manifest
-has to stay byte for byte as published, both for its signature and for this lookup.
+Checksum lookup ignores lines that do not match this format, including a tab or a single space as the
+separator, an uppercase digest, a digest of the wrong length, and the `digest *name` form that `sha256sum`
+writes in binary mode. A malformed additional line naming the same bundle does not invalidate a valid
+entry, but it cannot supply a checksum when the valid entry is absent. Lookup selects a pinned digest for
+each required bundle; it does not validate the format of every line in the published manifest.
+
+This filtering does not permit editing the tracked manifest: the separate provenance gate authenticates
+the entire file and compares it byte for byte with the published source. That requirement, including the
+original line endings, is why `tor-binary-resources/checksums/**` is excluded from end-of-line conversion in
+`.gitattributes`.
 
 ## Manifest provenance
 
