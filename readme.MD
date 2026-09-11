@@ -27,7 +27,7 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
    version under `torbrowser.checksum.source.url`:
    ```
    curl --fail --remote-name-all \
-       https://archive.torproject.org/tor-package-archive/torbrowser/15.0.21/{sha256sums-signed-build.txt,sha256sums-signed-build.txt.asc}
+       https://archive.torproject.org/tor-package-archive/torbrowser/15.0.22/{sha256sums-signed-build.txt,sha256sums-signed-build.txt.asc}
    mv sha256sums-signed-build.txt sha256sums-signed-build.txt.asc tor-binary-resources/checksums/
    ```
    Store the manifest exactly as published, with all its entries and without adding anything. It has to stay
