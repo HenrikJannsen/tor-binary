@@ -1,0 +1,243 @@
+<?xml version="1.0"?>
+<!--
+    Verification rules shared by both build entry points: the standalone Ant build
+    (build.xml) and the Maven build (the check-pgp-signatures profile in the root POM
+    and the tor-binary-resources module). The rules decide whether a downloaded Tor
+    expert bundle may be packaged, so they are kept in one place instead of being
+    repeated per entry point.
+
+    Callers must provide:
+      bundle.directory         directory holding the downloaded expert bundles
+      checksum.file            tracked SHA-256 manifest
+      checksum.source.url      published location of the manifest; when it is set, the
+                               tracked manifest is compared with the published file
+      torbrowser.version       Tor Browser release the bundles belong to
+      pgp.signature.keyserver  keyserver the pinned signing key is fetched from
+      pgp.keyring.directory    directory for the verification keyring; it is created and
+                               filled with the pinned key, and the caller removes it again
+
+    A caller that prepared the keyring itself sets pgp.keyring.prepared, which skips the
+    keyserver fetch. tools/verification-selftest.sh uses that to run its signature cases
+    offline with its own test keys.
+-->
+<project name="tor-binary-verification">
+
+    <!-- Primary key of "Tor Browser Developers (signing key)". It certifies the signing
+         subkey that changes over time, so pinning the primary key survives a subkey
+         rotation while still naming exactly one signer. -->
+    <property name="pgp.signing.key.fingerprint" value="EF6E286DDA85EA2A4BA7DE684E2C6E8793298290"/>
+
+    <target name="-require-caller-properties">
+        <fail unless="pgp.keyring.directory"
+              message="pgp.keyring.directory must name the directory used for the verification keyring"/>
+        <!-- Ant expands a macro attribute value again inside the macro body, so a path that
+             itself contains a property reference would resolve to one file in the signature
+             check, which passes the path as an attribute, and to another in the digest check
+             and the byte comparison, which use the property directly. Callers pass plain
+             paths; this makes that a rule rather than an assumption. -->
+        <fail message="checksum.file must not contain a property reference: ${checksum.file}">
+            <condition>
+                <and>
+                    <isset property="checksum.file"/>
+                    <contains string="${checksum.file}" substring="$${"/>
+                </and>
+            </condition>
+        </fail>
+        <fail message="bundle.directory must not contain a property reference: ${bundle.directory}">
+            <condition>
+                <and>
+                    <isset property="bundle.directory"/>
+                    <contains string="${bundle.directory}" substring="$${"/>
+                </and>
+            </condition>
+        </fail>
+    </target>
+
+    <target name="-fetch-signing-key" depends="-require-caller-properties" unless="pgp.keyring.prepared">
+        <!-- Verification runs against a keyring that holds the pinned key and nothing else.
+             Retrieving keys during verification instead, which is what gpg does with
+             auto-key-retrieve, pulls the key named by the signature into the caller's own
+             keyring: any key an attacker publishes is then present and usable, and the
+             signature check is reduced to whatever the status output is compared against.
+             Fetching the key here also picks up a revocation published after an earlier run,
+             which retrieval of missing keys alone never does. -->
+        <delete dir="${pgp.keyring.directory}" failonerror="false"/>
+        <mkdir dir="${pgp.keyring.directory}"/>
+        <chmod dir="${pgp.keyring.directory}" perm="700"/>
+        <exec executable="gpg" failonerror="true">
+            <arg value="--homedir"/>
+            <arg value="${pgp.keyring.directory}"/>
+            <arg value="--batch"/>
+            <arg value="--no-tty"/>
+            <arg value="--keyserver"/>
+            <arg value="${pgp.signature.keyserver}"/>
+            <arg value="--recv-keys"/>
+            <arg value="${pgp.signing.key.fingerprint}"/>
+        </exec>
+        <!-- Verifying a detached signature needs neither dirmngr nor the agent, and the
+             caller removes the directory these would keep running against. -->
+        <exec executable="gpgconf" failonerror="false" failifexecutionfails="false">
+            <arg value="--homedir"/>
+            <arg value="${pgp.keyring.directory}"/>
+            <arg value="--kill"/>
+            <arg value="all"/>
+        </exec>
+    </target>
+
+    <macrodef name="verify-pgp-signature">
+        <attribute name="file"/>
+        <sequential>
+            <local name="gpg.status"/>
+            <exec executable="gpg" failonerror="true" outputproperty="gpg.status" logError="true">
+                <arg value="--homedir"/>
+                <arg value="${pgp.keyring.directory}"/>
+                <arg value="--batch"/>
+                <arg value="--no-tty"/>
+                <arg value="--no-auto-key-retrieve"/>
+                <!-- gpg rejects MD5 on its own but still accepts SHA-1 data signatures. Tor
+                     signs with SHA-512, so refusing SHA-1 costs nothing here. -->
+                <arg value="--weak-digest"/>
+                <arg value="SHA1"/>
+                <arg value="--status-fd"/>
+                <arg value="1"/>
+                <arg value="--verify"/>
+                <arg value="@{file}.asc"/>
+                <arg value="@{file}"/>
+            </exec>
+            <!-- gpg's exit status only shows that the file carries some valid signature, so
+                 the status records decide. A record also carries text taken from the signing
+                 key: the user id printed in GOODSIG is chosen by whoever made the key, so a
+                 pattern that searches the output as a whole can be satisfied by a user id
+                 that spells out the expected record.
+
+                 Each pattern therefore requires a whole record: preceded by a real newline
+                 or the start of the output, which gpg never lets attacker-supplied text
+                 produce because it escapes CR and LF in status records. The newline is
+                 written out instead of using a start-of-line anchor, so the rule does not
+                 depend on which characters the regular expression engine counts as a line
+                 terminator; Java also counts U+0085, U+2028 and U+2029, and gpg passes those
+                 through unescaped.
+
+                 The fingerprint is compared as the tenth field of the VALIDSIG record, which
+                 is where gpg reports the primary key behind the signature: the primary key
+                 that certifies the signing subkey, or the signing key itself when a primary
+                 key signs directly. It must end the field, so a longer fingerprint starting
+                 with the same characters does not satisfy it. -->
+            <fail message="@{file} is not signed by ${pgp.signing.key.fingerprint}">
+                <condition>
+                    <not>
+                        <matches string="${gpg.status}"
+                                 pattern="(?:\A|\n)\[GNUPG:\] VALIDSIG (?:\S+ ){9}${pgp.signing.key.fingerprint}(?!\S)"/>
+                    </not>
+                </condition>
+            </fail>
+            <fail message="@{file} is signed by a revoked key">
+                <condition>
+                    <matches string="${gpg.status}" pattern="(?:\A|\n)\[GNUPG:\] REVKEYSIG "/>
+                </condition>
+            </fail>
+            <!-- An expired signing key stops the gate deliberately. Whether the signature was
+                 made before the key expired cannot be established from this output, and a
+                 cached key that upstream has since extended looks the same as a key that was
+                 really retired. Both need a person to look, and refreshing the key is what
+                 resolves the common case. -->
+            <fail message="@{file} is signed by an expired key. Refresh the key from ${pgp.signature.keyserver} and check whether it was extended or retired">
+                <condition>
+                    <matches string="${gpg.status}" pattern="(?:\A|\n)\[GNUPG:\] EXPKEYSIG "/>
+                </condition>
+            </fail>
+            <!-- Not reachable with current gpg output, which never reports VALIDSIG without
+                 one of GOODSIG, EXPKEYSIG or REVKEYSIG. Kept as the positive statement of what
+                 is required. -->
+            <fail message="@{file} carries no good signature">
+                <condition>
+                    <not>
+                        <matches string="${gpg.status}" pattern="(?:\A|\n)\[GNUPG:\] GOODSIG "/>
+                    </not>
+                </condition>
+            </fail>
+        </sequential>
+    </macrodef>
+
+    <macrodef name="verify-checksum">
+        <attribute name="bundle"/>
+        <sequential>
+            <local name="expected.checksum"/>
+            <local name="checksum.verified"/>
+            <loadfile property="expected.checksum" srcfile="${checksum.file}">
+                <filterchain>
+                    <linecontainsregexp>
+                        <regexp pattern="^[0-9a-f]{64}  \Q@{bundle}\E\r?$"/>
+                    </linecontainsregexp>
+                    <tokenfilter>
+                        <replaceregex pattern="  .*" replace=""/>
+                    </tokenfilter>
+                    <striplinebreaks/>
+                </filterchain>
+            </loadfile>
+            <fail unless="expected.checksum"
+                  message="No checksum found for @{bundle} in ${checksum.file}"/>
+            <fail message="More than one checksum entry for @{bundle} in ${checksum.file}">
+                <condition>
+                    <not>
+                        <matches string="${expected.checksum}" pattern="^[0-9a-f]{64}$"/>
+                    </not>
+                </condition>
+            </fail>
+            <checksum algorithm="SHA-256"
+                      file="${bundle.directory}/@{bundle}"
+                      property="${expected.checksum}"
+                      verifyproperty="checksum.verified"/>
+            <fail message="Checksum verification failed for @{bundle}">
+                <condition>
+                    <not>
+                        <equals arg1="${checksum.verified}" arg2="true"/>
+                    </not>
+                </condition>
+            </fail>
+        </sequential>
+    </macrodef>
+
+    <target name="verify-checksum-manifest" depends="-fetch-signing-key"
+            description="Verify the tracked SHA-256 manifest against its signature and its published source">
+        <fail unless="checksum.source.url"
+              message="checksum.source.url must name the manifest published for the configured torbrowser.version"/>
+        <verify-pgp-signature file="${checksum.file}"/>
+
+        <!-- The signature shows that Tor published the manifest, not that it belongs to the
+             configured release: the manifest of any other release carries a valid signature
+             as well. -->
+        <local name="published.checksum.file"/>
+        <tempfile property="published.checksum.file" prefix="sha256sums-signed-build" suffix=".txt"
+                  destdir="${java.io.tmpdir}" createfile="true" deleteonexit="true"/>
+        <get src="${checksum.source.url}" dest="${published.checksum.file}"/>
+        <fail message="The tracked checksum manifest differs from ${checksum.source.url}">
+            <condition>
+                <not>
+                    <filesmatch file1="${checksum.file}" file2="${published.checksum.file}"/>
+                </not>
+            </condition>
+        </fail>
+        <delete file="${published.checksum.file}"/>
+    </target>
+
+    <target name="verify-bundle-signatures" depends="-fetch-signing-key"
+            description="Verify the detached PGP signature of every selected expert bundle">
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"/>
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz"/>
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz"/>
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"/>
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"/>
+        <verify-pgp-signature file="${bundle.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"/>
+    </target>
+
+    <target name="verify-bundle-checksums"
+            description="Verify every selected expert bundle against the tracked SHA-256 manifest">
+        <verify-checksum bundle="tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"/>
+        <verify-checksum bundle="tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz"/>
+        <verify-checksum bundle="tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz"/>
+        <verify-checksum bundle="tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"/>
+        <verify-checksum bundle="tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"/>
+        <verify-checksum bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"/>
+    </target>
+</project>
