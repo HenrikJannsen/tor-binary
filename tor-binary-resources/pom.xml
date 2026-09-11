@@ -60,17 +60,44 @@
                                     <fileset dir="${project.basedir}/checksums" />
                                 </copy>
 
-                                <condition property="checksumsMatch">
-                                    <and>
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz" />
-                                    </and>
-                                </condition>
-                                <fail unless="checksumsMatch" />
+                                <property name="checksum.file" value="${project.basedir}/checksums/sha256sums-signed-build.txt"/>
+                                <macrodef name="verify-checksum">
+                                    <attribute name="bundle"/>
+                                    <attribute name="id"/>
+                                    <sequential>
+                                        <loadfile property="checksum.@{id}.expected" srcfile="${checksum.file}">
+                                            <filterchain>
+                                                <linecontainsregexp>
+                                                    <regexp pattern="^[0-9a-f]{64}  @{bundle}$"/>
+                                                </linecontainsregexp>
+                                                <tokenfilter>
+                                                    <replaceregex pattern="  .*" replace=""/>
+                                                </tokenfilter>
+                                                <striplinebreaks/>
+                                            </filterchain>
+                                        </loadfile>
+                                        <fail unless="checksum.@{id}.expected"
+                                              message="No checksum found for @{bundle} in ${checksum.file}"/>
+                                        <checksum algorithm="SHA-256"
+                                                  file="${project.source.directory}/@{bundle}"
+                                                  property="${checksum.@{id}.expected}"
+                                                  verifyproperty="checksum.@{id}.verified"/>
+                                        <fail message="Checksum verification failed for @{bundle}">
+                                            <condition>
+                                                <not>
+                                                    <equals arg1="${checksum.@{id}.verified}" arg2="true"/>
+                                                </not>
+                                            </condition>
+                                        </fail>
+                                    </sequential>
+                                </macrodef>
+
+                                <verify-checksum bundle="tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz" id="windows-i686"/>
+                                <verify-checksum bundle="tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz" id="windows-x86_64"/>
+                                <verify-checksum bundle="tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz" id="macos-x86_64"/>
+                                <verify-checksum bundle="tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz" id="macos-aarch64"/>
+                                <verify-checksum bundle="tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz" id="linux-i686"/>
+                                <verify-checksum bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz" id="linux-x86_64"/>
                             </target>
                         </configuration>
                         <goals>

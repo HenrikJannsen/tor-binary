@@ -14,29 +14,23 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 1. Replace `torbrowser.version` with the target Tor Browser bundle version in the root [Maven file](pom.xml)
 2. Find out which `tor binary version` is used in that Tor Browser release. Use that as the Maven project version.
 3. Set `revision` to the `tor-binary version` in the root [Maven file](pom.xml)
-4. Get the hash values of the new version from https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]/sha256sums-signed-build.txt and update the files inside [tor-binary-resources/checksums](tor-binary-resources/checksums). Alternatively, run `ant -f build.xml` to verify signatures and regenerate the checksum files.
+4. Download the complete `sha256sums-signed-build.txt` for the new version from `torbrowser.checksum.source.url`, preserve every upstream entry, and add its source URL as the first comment in [the tracked checksum manifest](tor-binary-resources/checksums/sha256sums-signed-build.txt).
 5. Verify the Tor expert bundle PGP signatures with Maven:
    ```
    mvn -N -Pcheck-pgp-signatures verify
    ```
 
-When updating checksums, make sure the six filenames in `tor-binary-resources/checksums` exactly match the six bundles listed in `build.xml`. Remove checksum files from the previous Tor Browser version before running Ant; Ant writes new files but does not remove obsolete files. For a manual update, copy the SHA-256 value for each `tor-expert-bundle-*.tar.gz` from the signed checksum list for the selected Tor Browser version into a file named `<bundle>.tar.gz.SHA-256` (the file must contain only the hash). For the current version, the [signed checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.22/sha256sums-signed-build.txt) is the source of truth. Then verify the result with:
+The version-independent manifest filename makes future updates a one-file replacement. Keeping all upstream entries makes the tracked file easy to compare with its source, while the build requires an exact manifest entry and matching SHA-256 digest for every downloaded expert bundle. The source comment is intentionally the only line added to the upstream contents. For the current version, the [Tor Browser 15.0.22 checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.22/sha256sums-signed-build.txt) is the source of truth. Verify its detached signature before updating the tracked manifest, then verify the bundles with:
 
 ```
-rm tor-binary-resources/checksums/tor-expert-bundle-*.SHA-256
-ant -f build.xml
+curl --fail --remote-name-all \
+    https://archive.torproject.org/tor-package-archive/torbrowser/15.0.22/{sha256sums-signed-build.txt,sha256sums-signed-build.txt.asc}
+gpg --verify sha256sums-signed-build.txt.asc sha256sums-signed-build.txt
 mvn -N -Pcheck-pgp-signatures verify
+mvn clean install
 ```
 
-The first two commands download the bundles, verify their PGP signatures, and regenerate the checksum files. Because each tracked checksum file contains only a hash, use the following command to compare the regenerated checksums with the downloaded bundles in `tmp`:
-
-```
-for checksum in tor-binary-resources/checksums/*.SHA-256; do
-    bundle="${checksum##*/}"
-    bundle="${bundle%.SHA-256}"
-    test "$(cat "$checksum")" = "$(sha256sum "tmp/$bundle" | cut -d' ' -f1)"
-done
-```
+The first two commands authenticate the downloaded checksum list before it is copied into the repository. The Maven signature profile independently verifies each expert bundle's detached signature; `mvn clean install` then checks every bundle against the pinned manifest before packaging it.
 
 After changing the two version properties, run `mvn clean install` to confirm that all platform artifacts and the GeoIP artifact can be built.
 
@@ -44,7 +38,7 @@ Tor Browser versions can be found here: https://archive.torproject.org/tor-packa
 
 # Pre-requisites
 
-- GPG, when checking PGP signatures with Maven or refreshing checksums with `build.xml`
+- GPG, when checking PGP signatures with Maven or `build.xml`
 - tar with gzip/xz support
 - network access to `archive.torproject.org` and `keys.openpgp.org` for PGP signature checks
 
