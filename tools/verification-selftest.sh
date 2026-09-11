@@ -101,6 +101,14 @@ tab_separator="$(create_digest_fixture tab)"
 sed -i.bak "s|  tor-expert-bundle-linux-i686|\ttor-expert-bundle-linux-i686|" "$tab_separator/manifest.txt"
 expect_digest_failure "tab instead of two spaces as the separator" "$tab_separator" "No checksum found"
 
+malformed_entry="$(create_digest_fixture malformed-entry)"
+printf 'not-a-digest  tor-expert-bundle-linux-i686-%s.tar.gz\n' "$torbrowser_version" \
+    >> "$malformed_entry/manifest.txt"
+expect_digest_success "malformed additional entry does not override a valid checksum" "$malformed_entry"
+
+sed -i.bak '/^[0-9a-f]\{64\}  tor-expert-bundle-linux-i686-/d' "$malformed_entry/manifest.txt"
+expect_digest_failure "malformed entry cannot replace a valid checksum" "$malformed_entry" "No checksum found"
+
 identical_duplicate="$(create_digest_fixture identical-duplicate)"
 grep "tor-expert-bundle-windows-x86_64-$torbrowser_version.tar.gz" \
     "$identical_duplicate/manifest.txt" > "$identical_duplicate/repeated"
