@@ -13,7 +13,7 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 
 1. Replace `torbrowser.version` with the target Tor Browser bundle version in the root [Maven file](pom.xml)
 2. Find out which `tor binary version` is used in that Tor Browser release. Use that as the Maven project version.
-3. Set the `tor-binary version` in following Maven files:
+3. Set the `tor-binary version` in the following Maven files:
    - [pom.xml](pom.xml)
    - [tor-binary-geoip/pom.xml](tor-binary-geoip/pom.xml)
    - [tor-binary-linux32/pom.xml](tor-binary-linux32/pom.xml)
@@ -23,39 +23,51 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
    - [tor-binary-resources/pom.xml](tor-binary-resources/pom.xml)
    - [tor-binary-windows/pom.xml](tor-binary-windows/pom.xml)
    - [tor-binary-windows64/pom.xml](tor-binary-windows64/pom.xml)
-4. Get the hash values of the new version from https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]/sha256sums-signed-build.txt and update the files inside [tor-binary-resources/checksums](tor-binary-resources/checksums). Alternatively, run `ant -f build.xml` to verify signatures and regenerate the checksum files.
-5. Verify the Tor expert bundle PGP signatures with Maven:
+4. Replace the tracked checksum manifest and its detached signature with the files published for the new
+   version under `torbrowser.checksum.source.url`:
+   ```
+   curl --fail --remote-name-all \
+       https://archive.torproject.org/tor-package-archive/torbrowser/15.0.21/{sha256sums-signed-build.txt,sha256sums-signed-build.txt.asc}
+   mv sha256sums-signed-build.txt sha256sums-signed-build.txt.asc tor-binary-resources/checksums/
+   ```
+   Store the manifest exactly as published, with all its entries and without adding anything. It has to stay
+   byte identical to the upstream file, otherwise its signature no longer verifies.
+5. Verify the manifest and the expert bundles:
    ```
    mvn -N -Pcheck-pgp-signatures verify
    ```
+6. Build all artifacts:
+   ```
+   mvn clean install
+   ```
 
-When updating checksums, make sure the six filenames in `tor-binary-resources/checksums` exactly match the six bundles listed in `build.xml`. Remove checksum files from the previous Tor Browser version before running Ant; Ant writes new files but does not remove obsolete files. For a manual update, copy the SHA-256 value for each `tor-expert-bundle-*.tar.gz` from the signed checksum list for the selected Tor Browser version into a file named `<bundle>.tar.gz.SHA-256` (the file must contain only the hash). For the current version, the [signed checksum list](https://archive.torproject.org/tor-package-archive/torbrowser/15.0.21/sha256sums-signed-build.txt) is the source of truth. Then verify the result with:
+`mvn -N -Pcheck-pgp-signatures verify` performs the checks that need network access and GPG:
 
-```
-rm tor-binary-resources/checksums/tor-expert-bundle-*.SHA-256
-ant -f build.xml
-mvn -N -Pcheck-pgp-signatures verify
-```
+- the tracked manifest carries a valid signature made with the Tor Browser Developers key
+  `EF6E286DDA85EA2A4BA7DE684E2C6E8793298290`, which is pinned in [verification.xml](verification.xml),
+- the tracked manifest is byte for byte the file that is published for the configured `torbrowser.version`,
+- every expert bundle of that version carries a valid signature made with the same key.
 
-The first two commands download the bundles, verify their PGP signatures, and regenerate the checksum files. Because each tracked checksum file contains only a hash, use the following command to compare the regenerated checksums with the downloaded bundles in `tmp`:
+The pinned key is fetched from `pgp.signature.keyserver` at the start of each run into a keyring that is
+created for that run and holds nothing else, so no other key can satisfy a verification. The run therefore
+needs the keyserver to be reachable. Fetching every run is also what makes a revocation visible: a key that
+is already present is never refreshed on its own. A keyserver that serves a certificate with the revocation
+removed still hides it, which no verifier can detect.
 
-```
-for checksum in tor-binary-resources/checksums/*.SHA-256; do
-    bundle="${checksum##*/}"
-    bundle="${bundle%.SHA-256}"
-    test "$(cat "$checksum")" = "$(sha256sum "tmp/$bundle" | cut -d' ' -f1)"
-done
-```
+`ant -f build.xml` runs the same checks, plus the digest check below, and builds no artifact.
 
-After changing `torbrowser.version`, also update the Maven project version in every module listed above, then run `mvn clean install` to confirm that all platform artifacts and the GeoIP artifact can be built.
+`mvn clean install` needs neither GPG nor the keyserver. It verifies every downloaded expert bundle against
+the digest pinned in the tracked manifest and fails when an entry is missing or a digest differs, so no
+unverified bundle is ever packaged.
 
 Tor Browser versions can be found here: https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]
 
 # Pre-requisites
 
-- GPG, when checking PGP signatures with Maven or refreshing checksums with `build.xml`
+- GPG, when checking signatures with `mvn -Pcheck-pgp-signatures` or `build.xml`
 - tar with gzip/xz support
-- network access to `archive.torproject.org` and `keys.openpgp.org` for PGP signature checks
+- network access to `archive.torproject.org` for the bundles, and to the configured keyserver
+  (`hkps://keys.openpgp.org`) for the Tor signing key
 
 
 # Install

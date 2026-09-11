@@ -19,7 +19,8 @@
         -->
         <torbrowser.version>15.0.21</torbrowser.version>
         <torbrowser.download.base.url>https://archive.torproject.org/tor-package-archive/torbrowser/${torbrowser.version}</torbrowser.download.base.url>
-        <pgp.signature.keyserver>keys.openpgp.org</pgp.signature.keyserver>
+        <torbrowser.checksum.source.url>${torbrowser.download.base.url}/sha256sums-signed-build.txt</torbrowser.checksum.source.url>
+        <pgp.signature.keyserver>hkps://keys.openpgp.org</pgp.signature.keyserver>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.remote-resource.directory>${project.build.directory}/maven-shared-archive-resources</project.remote-resource.directory>
@@ -103,27 +104,20 @@
                                             </sequential>
                                         </macrodef>
 
-                                        <macrodef name="verify-tor-bundle">
-                                            <attribute name="bundle"/>
-                                            <sequential>
-                                                <exec executable="gpg" failonerror="true">
-                                                    <arg value="--batch"/>
-                                                    <arg value="--no-tty"/>
-                                                    <arg value="--auto-key-locate"/>
-                                                    <arg value="keyserver"/>
-                                                    <arg value="--keyserver"/>
-                                                    <arg value="${pgp.signature.keyserver}"/>
-                                                    <arg value="--keyserver-options"/>
-                                                    <arg value="auto-key-retrieve"/>
-                                                    <arg value="--verify"/>
-                                                    <arg value="${pgp.signature.check.directory}/@{bundle}.asc"/>
-                                                    <arg value="${pgp.signature.check.directory}/@{bundle}"/>
-                                                </exec>
-                                            </sequential>
-                                        </macrodef>
+                                        <property name="torbrowser.checksum.file"
+                                                  value="${project.basedir}/tor-binary-resources/checksums/sha256sums-signed-build.txt"/>
 
                                         <delete dir="${pgp.signature.check.directory}" failonerror="false"/>
                                         <mkdir dir="${pgp.signature.check.directory}"/>
+
+                                        <!-- Checked before the bundles are downloaded. This call also creates the
+                                             verification keyring that the second call reuses. -->
+                                        <ant antfile="${project.basedir}/verification.xml" target="verify-checksum-manifest" inheritall="false">
+                                            <property name="checksum.file" value="${torbrowser.checksum.file}"/>
+                                            <property name="checksum.source.url" value="${torbrowser.checksum.source.url}"/>
+                                            <property name="pgp.signature.keyserver" value="${pgp.signature.keyserver}"/>
+                                            <property name="pgp.keyring.directory" value="${pgp.signature.check.directory}/verification-keyring"/>
+                                        </ant>
 
                                         <parallel>
                                             <fetch-tor-bundle bundle="tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"/>
@@ -134,12 +128,13 @@
                                             <fetch-tor-bundle bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"/>
                                         </parallel>
 
-                                        <verify-tor-bundle bundle="tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz"/>
-                                        <verify-tor-bundle bundle="tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz"/>
-                                        <verify-tor-bundle bundle="tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz"/>
-                                        <verify-tor-bundle bundle="tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"/>
-                                        <verify-tor-bundle bundle="tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"/>
-                                        <verify-tor-bundle bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"/>
+                                        <ant antfile="${project.basedir}/verification.xml" target="verify-bundle-signatures" inheritall="false">
+                                            <property name="bundle.directory" value="${pgp.signature.check.directory}"/>
+                                            <property name="torbrowser.version" value="${torbrowser.version}"/>
+                                            <property name="pgp.signature.keyserver" value="${pgp.signature.keyserver}"/>
+                                            <property name="pgp.keyring.directory" value="${pgp.signature.check.directory}/verification-keyring"/>
+                                            <property name="pgp.keyring.prepared" value="true"/>
+                                        </ant>
 
                                         <delete dir="${pgp.signature.check.directory}" failonerror="false"/>
                                     </target>

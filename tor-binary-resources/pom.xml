@@ -56,21 +56,11 @@
                                         skipexisting="true"/>
                                 </parallel>
 
-                                <copy todir="${project.source.directory}">
-                                    <fileset dir="${project.basedir}/checksums" />
-                                </copy>
-
-                                <condition property="checksumsMatch">
-                                    <and>
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz" />
-                                        <checksum algorithm="SHA-256" file="${project.source.directory}/tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz" />
-                                    </and>
-                                </condition>
-                                <fail unless="checksumsMatch" />
+                                <ant antfile="${project.basedir}/../verification.xml" target="verify-bundle-checksums" inheritall="false">
+                                    <property name="bundle.directory" value="${project.source.directory}"/>
+                                    <property name="checksum.file" value="${project.basedir}/checksums/sha256sums-signed-build.txt"/>
+                                    <property name="torbrowser.version" value="${torbrowser.version}"/>
+                                </ant>
                             </target>
                         </configuration>
                         <goals>
