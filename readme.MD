@@ -60,11 +60,17 @@ removed still hides it, which no verifier can detect.
 the digest pinned in the tracked manifest and fails when an entry is missing or a digest differs, so no
 unverified bundle is ever packaged.
 
+[tools/verification-selftest.sh](tools/verification-selftest.sh) checks the rules themselves against local
+fixtures and its own throwaway test keys. It covers the digest rules, the signature rules, including a
+signature made with an unrelated key, a revoked key, an expired key and content changed after signing, and
+the key fetch against a stub keyserver on the loopback interface. It needs no network access and never
+touches your own GPG keyring.
+
 Tor Browser versions can be found here: https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]
 
 # Pre-requisites
 
-- GPG, when checking signatures with `mvn -Pcheck-pgp-signatures` or `build.xml`
+- GPG, when checking signatures with `mvn -Pcheck-pgp-signatures` or `build.xml`, and for the self-test
 - tar with gzip/xz support
 - network access to `archive.torproject.org` for the bundles, and to the configured keyserver
   (`hkps://keys.openpgp.org`) for the Tor signing key
