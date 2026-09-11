@@ -11,18 +11,9 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 
 # Update to new version
 
-1. Replace `torbrowser.version` with the target Tor Browser bundle version in the [build file](build.xml) and the [Maven file](pom.xml)
+1. Replace `torbrowser.version` with the target Tor Browser bundle version in the root [Maven file](pom.xml)
 2. Find out which `tor binary version` is used in that Tor Browser release. Use that as the Maven project version.
-3. Set the `tor-binary version` in following Maven files:
-   - [pom.xml](pom.xml)
-   - [tor-binary-geoip/pom.xml](tor-binary-geoip/pom.xml)
-   - [tor-binary-linux32/pom.xml](tor-binary-linux32/pom.xml)
-   - [tor-binary-linux64/pom.xml](tor-binary-linux64/pom.xml)
-   - [tor-binary-macos/pom.xml](tor-binary-macos/pom.xml)
-   - [tor-binary-macos-aarch64/pom.xml](tor-binary-macos-aarch64/pom.xml)
-   - [tor-binary-resources/pom.xml](tor-binary-resources/pom.xml)
-   - [tor-binary-windows/pom.xml](tor-binary-windows/pom.xml)
-   - [tor-binary-windows64/pom.xml](tor-binary-windows64/pom.xml)
+3. Set `revision` to the `tor-binary version` in the root [Maven file](pom.xml)
 4. Get the hash values of the new version from https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]/sha256sums-signed-build.txt and update the files inside [tor-binary-resources/checksums](tor-binary-resources/checksums). Alternatively, run `ant -f build.xml` to verify signatures and regenerate the checksum files.
 5. Verify the Tor expert bundle PGP signatures with Maven:
    ```
@@ -47,7 +38,7 @@ for checksum in tor-binary-resources/checksums/*.SHA-256; do
 done
 ```
 
-After changing `torbrowser.version`, also update the Maven project version in every module listed above, then run `mvn clean install` to confirm that all platform artifacts and the GeoIP artifact can be built.
+After changing the two version properties, run `mvn clean install` to confirm that all platform artifacts and the GeoIP artifact can be built.
 
 Tor Browser versions can be found here: https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]
 
