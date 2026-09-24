@@ -56,10 +56,13 @@
                                         skipexisting="true"/>
                                 </parallel>
 
-                                <ant antfile="${project.basedir}/../verification.xml" target="verify-bundle-checksums" inheritall="false">
+                                <ant antfile="${project.basedir}/../verification.xml" inheritall="false">
+                                    <target name="verify-bundle-checksums"/>
+                                    <target name="verify-bundle-tor-versions"/>
                                     <property name="bundle.directory" value="${project.source.directory}"/>
                                     <property name="checksum.file" value="${project.basedir}/checksums/sha256sums-signed-build.txt"/>
                                     <property name="torbrowser.version" value="${torbrowser.version}"/>
+                                    <property name="tor.version" value="${project.version}"/>
                                 </ant>
                             </target>
                         </configuration>

@@ -12,6 +12,8 @@
       checksum.source.url      published location of the manifest; when it is set, the
                                tracked manifest is compared with the published file
       torbrowser.version       Tor Browser release the bundles belong to
+      tor.version              tor version that the Maven project version declares; the tor
+                               executable in every bundle must report it
       pgp.signature.keyserver  keyserver the pinned signing key is fetched from
       pgp.keyring.directory    directory for the verification keyring; it is created and
                                filled with the pinned key, and the caller removes it again
@@ -198,6 +200,80 @@
         </sequential>
     </macrodef>
 
+    <macrodef name="verify-tor-build-version">
+        <attribute name="bundle"/>
+        <attribute name="executable"/>
+        <sequential>
+            <local name="tor.executable.present"/>
+            <local name="tor.build.versions"/>
+            <fail message="Could not find ${bundle.directory}/@{bundle}">
+                <condition>
+                    <not>
+                        <available file="${bundle.directory}/@{bundle}" type="file"/>
+                    </not>
+                </condition>
+            </fail>
+            <condition property="tor.executable.present">
+                <resourceexists>
+                    <tarentry name="@{executable}">
+                        <gzipresource>
+                            <file file="${bundle.directory}/@{bundle}"/>
+                        </gzipresource>
+                    </tarentry>
+                </resourceexists>
+            </condition>
+            <fail unless="tor.executable.present" message="@{bundle} does not contain @{executable}"/>
+            <!-- tor compiles tor_bug_suffix, " (on Tor <version> <git revision>)", into every
+                 build (src/lib/version/git_revision.c), with the release version from
+                 configure.ac. A build made with MSVC has no revision part, so the version ends at
+                 a space or at the closing parenthesis. The executable also holds unrelated
+                 versions, such as "0.4.9.1-alpha" or "Tor 0.1.2.17 and later", and the declared
+                 version can be the start of a longer one, so neither a search for the declared
+                 version nor for any version would be reliable.
+
+                 The filter chain leaves the distinct versions that follow "(on Tor ", separated
+                 by a space. ISO-8859-1 maps every byte to one character, so the executable is
+                 read without decoding errors. -->
+            <loadresource property="tor.build.versions" encoding="ISO-8859-1">
+                <tarentry name="@{executable}">
+                    <gzipresource>
+                        <file file="${bundle.directory}/@{bundle}"/>
+                    </gzipresource>
+                </tarentry>
+                <filterchain>
+                    <tokenfilter>
+                        <filetokenizer/>
+                        <replaceregex pattern=".*?\(on Tor (\d+\.\d+\.\d+\.\d+(?:-[0-9a-z]+)*)[ )]|.+"
+                                      replace="\1&#10;" flags="gs"/>
+                    </tokenfilter>
+                    <tokenfilter>
+                        <ignoreblank/>
+                    </tokenfilter>
+                    <sortfilter/>
+                    <tokenfilter delimoutput=" ">
+                        <uniqfilter/>
+                    </tokenfilter>
+                    <tokenfilter>
+                        <trim/>
+                    </tokenfilter>
+                </filterchain>
+            </loadresource>
+            <fail unless="tor.build.versions" message="@{executable} in @{bundle} reports no tor build version"/>
+            <fail message="@{executable} in @{bundle} reports more than one tor build version: ${tor.build.versions}">
+                <condition>
+                    <contains string="${tor.build.versions}" substring=" "/>
+                </condition>
+            </fail>
+            <fail message="@{executable} in @{bundle} reports tor ${tor.build.versions}, but the Maven project version declares tor ${tor.version}">
+                <condition>
+                    <not>
+                        <equals arg1="${tor.build.versions}" arg2="${tor.version}"/>
+                    </not>
+                </condition>
+            </fail>
+        </sequential>
+    </macrodef>
+
     <target name="verify-checksum-manifest" depends="-fetch-signing-key"
             description="Verify the tracked SHA-256 manifest against its signature and its published source">
         <fail unless="checksum.source.url"
@@ -239,5 +315,22 @@
         <verify-checksum bundle="tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz"/>
         <verify-checksum bundle="tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz"/>
         <verify-checksum bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz"/>
+    </target>
+
+    <!-- The bundles carry the Tor Browser version, and which tor version a Tor Browser release
+         contains is looked up by hand when the Maven project version is set. The signature and
+         digest checks establish that a bundle is genuine and belongs to the configured release,
+         not which tor version it contains. Callers run this after the digest check, so it reads
+         authenticated content. -->
+    <target name="verify-bundle-tor-versions"
+            description="Verify that the tor executable in every selected expert bundle reports the declared tor version">
+        <fail unless="tor.version"
+              message="tor.version must name the tor version that the Maven project version declares"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-windows-i686-${torbrowser.version}.tar.gz" executable="tor/tor.exe"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-windows-x86_64-${torbrowser.version}.tar.gz" executable="tor/tor.exe"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-macos-x86_64-${torbrowser.version}.tar.gz" executable="tor/tor"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-macos-aarch64-${torbrowser.version}.tar.gz" executable="tor/tor"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-linux-i686-${torbrowser.version}.tar.gz" executable="tor/tor"/>
+        <verify-tor-build-version bundle="tor-expert-bundle-linux-x86_64-${torbrowser.version}.tar.gz" executable="tor/tor"/>
     </target>
 </project>
