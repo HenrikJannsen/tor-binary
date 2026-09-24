@@ -5,7 +5,7 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 # Process
 
 1. Fetch Tor expert bundles in parallel
-2. Verify checksum
+2. Verify checksum and the tor version of each bundle
 3. Package the `tor/` directory from each bundle as `tor.tar.xz`
 4. Extract geoip files from the Linux x86_64 expert bundle
 
@@ -13,6 +13,8 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 
 1. Replace `torbrowser.version` with the target Tor Browser bundle version in the root [Maven file](pom.xml)
 2. Find out which `tor binary version` is used in that Tor Browser release. Use that as the Maven project version.
+   The [download page](https://www.torproject.org/download/tor/) lists it next to each release, for example
+   `15.0.23 (tor 0.4.9.12)`. The build fails when the tor executable in any bundle reports another version.
 3. Set the `tor-binary version` in the following Maven files:
    - [pom.xml](pom.xml)
    - [tor-binary-geoip/pom.xml](tor-binary-geoip/pom.xml)
@@ -54,17 +56,19 @@ needs the keyserver to be reachable. Fetching every run is also what makes a rev
 is already present is never refreshed on its own. A keyserver that serves a certificate with the revocation
 removed still hides it, which no verifier can detect.
 
-`ant -f build.xml` runs the same checks, plus the digest check below, and builds no artifact.
+`ant -f build.xml` runs the same checks, plus the digest and tor version checks below, and builds no artifact.
 
 `mvn clean install` needs neither GPG nor the keyserver. It verifies every downloaded expert bundle against
 the digest pinned in the tracked manifest and fails when an entry is missing or a digest differs, so no
-unverified bundle is ever packaged.
+unverified bundle is ever packaged. It then reads the version that tor compiles into the tor executable of
+every bundle and fails when it differs from the Maven project version. An artifact therefore cannot be
+published under a tor version that it does not contain.
 
 [tools/verification-selftest.sh](tools/verification-selftest.sh) checks the rules themselves against local
-fixtures and its own throwaway test keys. It covers the digest rules, the signature rules, including a
-signature made with an unrelated key, a revoked key, an expired key and content changed after signing, and
-the key fetch against a stub keyserver on the loopback interface. It needs no network access and never
-touches your own GPG keyring.
+fixtures and its own throwaway test keys. It covers the digest rules, the tor version rules, the signature
+rules, including a signature made with an unrelated key, a revoked key, an expired key and content changed
+after signing, and the key fetch against a stub keyserver on the loopback interface. It needs no network
+access and never touches your own GPG keyring.
 
 Tor Browser versions can be found here: https://archive.torproject.org/tor-package-archive/torbrowser/[torbrowser.version]
 

@@ -5,7 +5,7 @@
 # access to the Tor signing key. Run it after changing verification.xml.
 #
 # Usage: tools/verification-selftest.sh
-# Requires: ant (override with ANT=/path/to/ant), gpg, sha256sum
+# Requires: ant (override with ANT=/path/to/ant), gpg, sha256sum, tar with gzip support
 #
 # All GPG work happens in throwaway directories created by this script. The user's own
 # keyring is never read or modified, and no key is published anywhere.
@@ -122,6 +122,132 @@ expect_digest_failure "bundle file missing from the download directory" "$missin
 windows_line_endings="$(create_digest_fixture crlf)"
 sed -i.bak 's/$/\r/' "$windows_line_endings/manifest.txt"
 expect_digest_success "manifest with CRLF line endings" "$windows_line_endings"
+
+# ---------------------------------------------------------------------------------------
+# Tor version rules
+# ---------------------------------------------------------------------------------------
+
+build_version=" (on Tor 0.4.9.12 78923280eed3eff6)"
+
+tor_executable_of() {
+    case "$1" in
+        windows-*) echo "tor/tor.exe" ;;
+        *) echo "tor/tor" ;;
+    esac
+}
+
+# write_tor_executable <file> [build version string...]
+# Like the real executable, the stand-in also names unrelated versions and contains bytes
+# that a line-based reader or Java's regular expressions treat as line terminators.
+write_tor_executable() {
+    local file="$1"
+    shift
+    mkdir -p "$(dirname "$file")"
+    {
+        printf '\177ELF\000\n\r\205'
+        printf '%s\000' "0.4.9.1-alpha" "Tor 0.1.2.17 and later" "tor 0.4.9.11" "(on Tor unknown)"
+        for build_version_string in "$@"; do
+            printf '%s\000\n\205' "$build_version_string"
+        done
+        printf 'end\000'
+    } > "$file"
+}
+
+# write_version_bundle <case directory> <platform> <executable> [build version string...]
+write_version_bundle() {
+    local case_directory="$1" platform="$2" executable="$3"
+    shift 3
+    local content="$case_directory/content-$platform"
+    rm -rf "$content"
+    write_tor_executable "$content/$executable" "$@"
+    tar -czf "$case_directory/bundles/tor-expert-bundle-$platform-$torbrowser_version.tar.gz" -C "$content" tor
+}
+
+# create_version_fixture <case> [build version string...]
+# Writes the six bundles, each with a tor executable holding the given build version strings.
+create_version_fixture() {
+    local case_directory="$work_directory/version-$1"
+    shift
+    mkdir -p "$case_directory/bundles"
+    for platform in "${platforms[@]}"; do
+        write_version_bundle "$case_directory" "$platform" "$(tor_executable_of "$platform")" "$@"
+    done
+    echo "$case_directory"
+}
+
+run_version_verification() {
+    "$ant_command" -f "$project_root/verification.xml" verify-bundle-tor-versions \
+        "-Dbundle.directory=$1/bundles" \
+        "-Dtorbrowser.version=$torbrowser_version" \
+        "-Dtor.version=$2" 2>&1
+}
+
+# expect_version_success <name> <fixture> <declared version>
+expect_version_success() {
+    local output
+    output="$(run_version_verification "$2" "$3")"
+    if [ $? -eq 0 ]; then pass "$1"; else fail "$1" "verification failed although the fixture is valid" "$output"; fi
+}
+
+# expect_version_failure <name> <fixture> <declared version> <expected message>
+expect_version_failure() {
+    local output
+    output="$(run_version_verification "$2" "$3")"
+    if [ $? -eq 0 ]; then
+        fail "$1" "verification succeeded although it must not" "$output"
+    elif ! echo "$output" | grep -qF "$4"; then
+        fail "$1" "expected message '$4' not reported" "$output"
+    else
+        pass "$1"
+    fi
+}
+
+matching_versions="$(create_version_fixture matching "$build_version")"
+expect_version_success "every tor executable reports the declared version" "$matching_versions" 0.4.9.12
+
+# Release 0.4.9.13 was published with the executables of Tor Browser 15.0.23, which are tor 0.4.9.12.
+expect_version_failure "declared version differs from the reported one" "$matching_versions" 0.4.9.13 \
+    "reports tor 0.4.9.12, but the Maven project version declares tor 0.4.9.13"
+
+expect_version_failure "declared version is the start of the reported one" "$matching_versions" 0.4.9.1 \
+    "reports tor 0.4.9.12, but the Maven project version declares tor 0.4.9.1"
+
+# The six bundle names and executable names are built inside verify-bundle-tor-versions, so
+# each bundle gets a case of its own.
+for platform in "${platforms[@]}"; do
+    single_mismatch="$(create_version_fixture "mismatch-$platform" "$build_version")"
+    write_version_bundle "$single_mismatch" "$platform" "$(tor_executable_of "$platform")" \
+        " (on Tor 0.4.9.11 f3d28b2e0978ca07)"
+    expect_version_failure "only the $platform executable reports another version" "$single_mismatch" 0.4.9.12 \
+        "$(tor_executable_of "$platform") in tor-expert-bundle-$platform-$torbrowser_version.tar.gz reports tor 0.4.9.11"
+done
+
+without_revision="$(create_version_fixture without-revision " (on Tor 0.4.9.12)")"
+expect_version_success "build version without a git revision" "$without_revision" 0.4.9.12
+
+suffixed_version="$(create_version_fixture suffixed " (on Tor 0.4.9.12-dev 78923280eed3eff6)")"
+expect_version_failure "reported version with a suffix" "$suffixed_version" 0.4.9.12 \
+    "reports tor 0.4.9.12-dev, but the Maven project version declares tor 0.4.9.12"
+
+repeated_version="$(create_version_fixture repeated "$build_version" "$build_version")"
+expect_version_success "the same build version twice" "$repeated_version" 0.4.9.12
+
+two_versions="$(create_version_fixture two-versions "$build_version" " (on Tor 0.4.9.13 0123456789abcdef)")"
+expect_version_failure "two different build versions" "$two_versions" 0.4.9.12 \
+    "reports more than one tor build version: 0.4.9.12 0.4.9.13"
+
+no_version="$(create_version_fixture no-version)"
+expect_version_failure "no build version string" "$no_version" 0.4.9.12 "reports no tor build version"
+
+misnamed_executable="$(create_version_fixture misnamed "$build_version")"
+write_version_bundle "$misnamed_executable" windows-x86_64 tor/tor "$build_version"
+expect_version_failure "Windows bundle without tor.exe" "$misnamed_executable" 0.4.9.12 \
+    "tor-expert-bundle-windows-x86_64-$torbrowser_version.tar.gz does not contain tor/tor.exe"
+
+missing_version_bundle="$(create_version_fixture missing-bundle "$build_version")"
+rm "$missing_version_bundle/bundles/tor-expert-bundle-linux-i686-$torbrowser_version.tar.gz"
+expect_version_failure "bundle file missing from the download directory" "$missing_version_bundle" 0.4.9.12 \
+    "Could not find"
 
 # ---------------------------------------------------------------------------------------
 # Signature rules
