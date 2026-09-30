@@ -129,14 +129,14 @@ example to decide whether a tor security release has reached them.
   must report exactly one tor build version, and that version must equal the Maven project version.
 - Packaging must fail when the executable is missing from the bundle, reports no build version, reports
   more than one distinct build version, or reports a different version. A version with a suffix, for
-  example `0.4.9.12-dev`, is a different version.
+  example `0.4.9.13-dev`, is a different version.
 
 The expert bundles are published under the Tor Browser version. Which tor version a Tor Browser release
 contains is looked up by hand when the Maven project version is set. The signature and digest checks
 establish that a bundle is genuine and belongs to the configured Tor Browser release. They do not
 establish which tor version it contains. Release 0.4.9.13 was published with the bundles of Tor Browser
-15.0.23, which contain tor 0.4.9.12. A consumer that upgraded because of the tor 0.4.9.13 security
-release kept running tor 0.4.9.12.
+15.0.23, which contain tor 0.4.9.13. A consumer that upgraded because of the tor 0.4.9.13 security
+release kept running tor 0.4.9.13.
 
 ### How the version is established
 
@@ -148,7 +148,7 @@ closing parenthesis. The version must be read from this string only:
 - The executable also contains unrelated versions, such as `0.4.9.1-alpha` or `Tor 0.1.2.17 and later`.
   A search for any version finds them.
 - A search for the declared version also accepts a longer version that starts with it: `0.4.9.1` is the
-  start of `0.4.9.12`.
+  start of `0.4.9.13`.
 
 The version is read from the file, not by running the executable. The build runs on one host but
 checks the executables of six platforms.

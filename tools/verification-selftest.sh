@@ -127,7 +127,7 @@ expect_digest_success "manifest with CRLF line endings" "$windows_line_endings"
 # Tor version rules
 # ---------------------------------------------------------------------------------------
 
-build_version=" (on Tor 0.4.9.12 78923280eed3eff6)"
+build_version=" (on Tor 0.4.9.13 78923280eed3eff6)"
 
 tor_executable_of() {
     case "$1" in
@@ -203,14 +203,14 @@ expect_version_failure() {
 }
 
 matching_versions="$(create_version_fixture matching "$build_version")"
-expect_version_success "every tor executable reports the declared version" "$matching_versions" 0.4.9.12
+expect_version_success "every tor executable reports the declared version" "$matching_versions" 0.4.9.13
 
-# Release 0.4.9.13 was published with the executables of Tor Browser 15.0.23, which are tor 0.4.9.12.
+# Release 0.4.9.13 was published with the executables of Tor Browser 15.0.23, which are tor 0.4.9.13.
 expect_version_failure "declared version differs from the reported one" "$matching_versions" 0.4.9.13 \
-    "reports tor 0.4.9.12, but the Maven project version declares tor 0.4.9.13"
+    "reports tor 0.4.9.13, but the Maven project version declares tor 0.4.9.13"
 
 expect_version_failure "declared version is the start of the reported one" "$matching_versions" 0.4.9.1 \
-    "reports tor 0.4.9.12, but the Maven project version declares tor 0.4.9.1"
+    "reports tor 0.4.9.13, but the Maven project version declares tor 0.4.9.1"
 
 # The six bundle names and executable names are built inside verify-bundle-tor-versions, so
 # each bundle gets a case of its own.
@@ -218,35 +218,35 @@ for platform in "${platforms[@]}"; do
     single_mismatch="$(create_version_fixture "mismatch-$platform" "$build_version")"
     write_version_bundle "$single_mismatch" "$platform" "$(tor_executable_of "$platform")" \
         " (on Tor 0.4.9.11 f3d28b2e0978ca07)"
-    expect_version_failure "only the $platform executable reports another version" "$single_mismatch" 0.4.9.12 \
+    expect_version_failure "only the $platform executable reports another version" "$single_mismatch" 0.4.9.13 \
         "$(tor_executable_of "$platform") in tor-expert-bundle-$platform-$torbrowser_version.tar.gz reports tor 0.4.9.11"
 done
 
-without_revision="$(create_version_fixture without-revision " (on Tor 0.4.9.12)")"
-expect_version_success "build version without a git revision" "$without_revision" 0.4.9.12
+without_revision="$(create_version_fixture without-revision " (on Tor 0.4.9.13)")"
+expect_version_success "build version without a git revision" "$without_revision" 0.4.9.13
 
-suffixed_version="$(create_version_fixture suffixed " (on Tor 0.4.9.12-dev 78923280eed3eff6)")"
-expect_version_failure "reported version with a suffix" "$suffixed_version" 0.4.9.12 \
-    "reports tor 0.4.9.12-dev, but the Maven project version declares tor 0.4.9.12"
+suffixed_version="$(create_version_fixture suffixed " (on Tor 0.4.9.13-dev 78923280eed3eff6)")"
+expect_version_failure "reported version with a suffix" "$suffixed_version" 0.4.9.13 \
+    "reports tor 0.4.9.13-dev, but the Maven project version declares tor 0.4.9.13"
 
 repeated_version="$(create_version_fixture repeated "$build_version" "$build_version")"
-expect_version_success "the same build version twice" "$repeated_version" 0.4.9.12
+expect_version_success "the same build version twice" "$repeated_version" 0.4.9.13
 
 two_versions="$(create_version_fixture two-versions "$build_version" " (on Tor 0.4.9.13 0123456789abcdef)")"
-expect_version_failure "two different build versions" "$two_versions" 0.4.9.12 \
-    "reports more than one tor build version: 0.4.9.12 0.4.9.13"
+expect_version_failure "two different build versions" "$two_versions" 0.4.9.13 \
+    "reports more than one tor build version: 0.4.9.13 0.4.9.13"
 
 no_version="$(create_version_fixture no-version)"
-expect_version_failure "no build version string" "$no_version" 0.4.9.12 "reports no tor build version"
+expect_version_failure "no build version string" "$no_version" 0.4.9.13 "reports no tor build version"
 
 misnamed_executable="$(create_version_fixture misnamed "$build_version")"
 write_version_bundle "$misnamed_executable" windows-x86_64 tor/tor "$build_version"
-expect_version_failure "Windows bundle without tor.exe" "$misnamed_executable" 0.4.9.12 \
+expect_version_failure "Windows bundle without tor.exe" "$misnamed_executable" 0.4.9.13 \
     "tor-expert-bundle-windows-x86_64-$torbrowser_version.tar.gz does not contain tor/tor.exe"
 
 missing_version_bundle="$(create_version_fixture missing-bundle "$build_version")"
 rm "$missing_version_bundle/bundles/tor-expert-bundle-linux-i686-$torbrowser_version.tar.gz"
-expect_version_failure "bundle file missing from the download directory" "$missing_version_bundle" 0.4.9.12 \
+expect_version_failure "bundle file missing from the download directory" "$missing_version_bundle" 0.4.9.13 \
     "Could not find"
 
 # ---------------------------------------------------------------------------------------
