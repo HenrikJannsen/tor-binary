@@ -205,9 +205,9 @@ expect_version_failure() {
 matching_versions="$(create_version_fixture matching "$build_version")"
 expect_version_success "every tor executable reports the declared version" "$matching_versions" 0.4.9.13
 
-# Release 0.4.9.13 was published with the executables of Tor Browser 15.0.23, which are tor 0.4.9.13.
-expect_version_failure "declared version differs from the reported one" "$matching_versions" 0.4.9.13 \
-    "reports tor 0.4.9.13, but the Maven project version declares tor 0.4.9.13"
+# Tor Browser 15.0.23 contains tor 0.4.9.13; a different declared project version must fail.
+expect_version_failure "declared version differs from the reported one" "$matching_versions" 0.4.9.12 \
+    "reports tor 0.4.9.13, but the Maven project version declares tor 0.4.9.12"
 
 expect_version_failure "declared version is the start of the reported one" "$matching_versions" 0.4.9.1 \
     "reports tor 0.4.9.13, but the Maven project version declares tor 0.4.9.1"
@@ -232,9 +232,9 @@ expect_version_failure "reported version with a suffix" "$suffixed_version" 0.4.
 repeated_version="$(create_version_fixture repeated "$build_version" "$build_version")"
 expect_version_success "the same build version twice" "$repeated_version" 0.4.9.13
 
-two_versions="$(create_version_fixture two-versions "$build_version" " (on Tor 0.4.9.13 0123456789abcdef)")"
+two_versions="$(create_version_fixture two-versions "$build_version" " (on Tor 0.4.9.12 0123456789abcdef)")"
 expect_version_failure "two different build versions" "$two_versions" 0.4.9.13 \
-    "reports more than one tor build version: 0.4.9.13 0.4.9.13"
+    "reports more than one tor build version: 0.4.9.12 0.4.9.13"
 
 no_version="$(create_version_fixture no-version)"
 expect_version_failure "no build version string" "$no_version" 0.4.9.13 "reports no tor build version"
