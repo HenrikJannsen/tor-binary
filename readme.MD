@@ -14,7 +14,7 @@ Package native Tor files from [Tor Browser project](https://www.torproject.org/)
 1. Replace `torbrowser.version` with the target Tor Browser bundle version in the root [Maven file](pom.xml)
 2. Find out which `tor binary version` is used in that Tor Browser release. Use that as the Maven project version.
    The [download page](https://www.torproject.org/download/tor/) lists it next to each release, for example
-   `15.0.23 (tor 0.4.9.12)`. The build fails when the tor executable in any bundle reports another version.
+   `15.0.23 (tor 0.4.9.13)`. The build fails when the tor executable in any bundle reports another version.
 3. Set the `tor-binary version` in the following Maven files:
    - [pom.xml](pom.xml)
    - [tor-binary-geoip/pom.xml](tor-binary-geoip/pom.xml)
